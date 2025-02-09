@@ -10,6 +10,7 @@
     "react-scripts": "5.0.1"
   },
   "scripts": {
+    "postinstall": "chmod +x ./node_modules/.bin/craco",
     "start": "craco start",
     "build": "craco build",
     "test": "craco test",
