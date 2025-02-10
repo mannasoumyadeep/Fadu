@@ -18,15 +18,23 @@ function App() {
 
   // WebSocket state
   const roomId = "room1";
+  // Use playerName if provided; otherwise use a default (this helps during initial load)
   const userId = playerName || "player1";  
   const [socket, setSocket] = useState(null);
 
-  // IMPORTANT: Update this URL with your actual Render backend URL.
+  // IMPORTANT: Your deployed backend URL (using wss:// for secure WebSocket connection)
   const backendURL = "wss://fadu-backend.onrender.com";
 
-  // Establish WebSocket connection when playerName is provided.
+  // Debug log to verify current state
+  console.log("Rendering App: gameStarted =", gameStarted, "playerName =", playerName);
+
+  // Establish WebSocket connection only when a player name is provided
   useEffect(() => {
-    if (!playerName) return;  // Wait until a name is entered.
+    if (!playerName) {
+      console.log("No player name entered yet. Skipping WebSocket connection.");
+      return; // Do not attempt connection until a name is provided
+    }
+    console.log("Attempting to connect WebSocket for user:", userId);
     const ws = new WebSocket(`${backendURL}/ws/${roomId}/${userId}`);
     
     ws.onopen = () => {
@@ -38,17 +46,17 @@ function App() {
       console.log("Received:", data);
       
       if (data.type === "welcome") {
-        // Set the initial hand for the player.
+        // Set the initial hand for the player
         setPlayers([{ id: userId, name: playerName, hand: data.hand, score: 0 }]);
       } else if (data.type === "update_hand") {
-        // Update only this player’s hand.
+        // Update only this player's hand
         setPlayers(prevPlayers =>
           prevPlayers.map(player =>
             player.id === userId ? { ...player, hand: data.hand } : player
           )
         );
       } else if (data.type === "table_update") {
-        // Update the public table card.
+        // Update the public table card
         if (data.tableCard) {
           setTableCard(data.tableCard);
         }
@@ -68,7 +76,7 @@ function App() {
     
     setSocket(ws);
     
-    // Clean up on component unmount.
+    // Clean up on component unmount
     return () => {
       ws.close();
     };
@@ -104,6 +112,7 @@ function App() {
       alert('Please enter your name');
       return;
     }
+    console.log("Starting game for player:", playerName);
     setGameStarted(true);
   };
 
@@ -120,10 +129,11 @@ function App() {
     setPlayerName('');
   };
 
+  // Render the join screen if the game has not started
   if (!gameStarted) {
     return (
       <div className="game-container">
-        <div className="setup-form">
+        <div className="setup-form" style={{ border: '2px solid red', padding: '20px' }}>
           <h1 className="title">Fadu Card Game</h1>
           <div className="input-group">
             <label>Your Name:</label>
@@ -166,6 +176,7 @@ function App() {
     );
   }
 
+  // Once gameStarted is true, render the game board
   return (
     <div className="game-container">
       <div className="game-board">
