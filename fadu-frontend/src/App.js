@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import WebSocketGame from './WebSocketGame'; // (Note: Although imported, this component is not used directly in the render below.)
 import './styles.css';
 
 function App() {
@@ -9,24 +8,26 @@ function App() {
   const [numRounds, setNumRounds] = useState(5);
   const [currentRound, setCurrentRound] = useState(1);
   const [players, setPlayers] = useState([]);
-  const [currentPlayer, setCurrentPlayer] = useState(0);
   const [deck, setDeck] = useState([]);
   const [tableCard, setTableCard] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [showWinner, setShowWinner] = useState(false);
   const [gameWinners, setGameWinners] = useState([]);
   const [hasDrawn, setHasDrawn] = useState(false);
+  const [playerName, setPlayerName] = useState('');
 
   // WebSocket state
-  // For now, we use static values; you can later prompt the user for these.
   const roomId = "room1";
-  const userId = "player1";
+  const userId = playerName || "player1";  
   const [socket, setSocket] = useState(null);
 
-  // Establish WebSocket connection on mount
+  // IMPORTANT: Update this URL with your actual Render backend URL.
+  const backendURL = "wss://fadu-backend.onrender.com";
+
+  // Establish WebSocket connection when playerName is provided.
   useEffect(() => {
-    // Change the URL when deploying your backend (and use "wss://" for secure connections)
-    const ws = new WebSocket(`wss://fadu-backend.onrender.com/ws/${roomId}/${userId}`);
+    if (!playerName) return;  // Wait until a name is entered.
+    const ws = new WebSocket(`${backendURL}/ws/${roomId}/${userId}`);
     
     ws.onopen = () => {
       console.log('Connected to WebSocket server');
@@ -37,24 +38,23 @@ function App() {
       console.log("Received:", data);
       
       if (data.type === "welcome") {
-        // For example, log the welcome message
-        console.log(data.message);
-      } else if (data.type === "private_update") {
-        // Update the player's hand using the players state.
+        // Set the initial hand for the player.
+        setPlayers([{ id: userId, name: playerName, hand: data.hand, score: 0 }]);
+      } else if (data.type === "update_hand") {
+        // Update only this player’s hand.
         setPlayers(prevPlayers =>
           prevPlayers.map(player =>
             player.id === userId ? { ...player, hand: data.hand } : player
           )
         );
-      } else if (data.type === "public_update") {
-        // Update public game state, such as the table card.
+      } else if (data.type === "table_update") {
+        // Update the public table card.
         if (data.tableCard) {
           setTableCard(data.tableCard);
         }
         console.log("Broadcast:", data.message);
-      } else if (data.type === "broadcast") {
-        // Optionally handle generic broadcast messages.
-        console.log("Broadcast:", data.message);
+      } else {
+        console.log("Message:", data.message);
       }
     };
     
@@ -68,32 +68,13 @@ function App() {
     
     setSocket(ws);
     
-    // Clean up on component unmount
+    // Clean up on component unmount.
     return () => {
       ws.close();
     };
-  }, [roomId, userId]);
+  }, [playerName, userId, roomId]);
 
-  // Initialize a new deck of cards
-  const initializeDeck = () => {
-    const suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
-    const values = Array.from({ length: 13 }, (_, i) => i + 1);
-    let newDeck = [];
-    for (const suit of suits) {
-      for (const value of values) {
-        newDeck.push({ suit, value });
-      }
-    }
-    return newDeck.sort(() => Math.random() - 0.5);
-  };
-
-  // Reshuffle the deck
-  const reshuffleDeck = () => {
-    const newDeck = initializeDeck();
-    setDeck(newDeck);
-  };
-
-  // Trigger drawing a card by sending an action via WebSocket
+  // Functions for actions
   const drawCard = () => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ action: "draw_card" }));
@@ -103,7 +84,6 @@ function App() {
     }
   };
 
-  // Trigger playing a card by sending the selected card index via WebSocket
   const playCard = () => {
     if (selectedCard === null) return;
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -113,71 +93,18 @@ function App() {
     }
   };
 
-  // Trigger the call action via WebSocket
   const handleCall = () => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ action: "call" }));
     }
   };
 
-  // Local functions to manage rounds and scoring
-  const handlePlayerWin = () => {
-    const newPlayers = [...players];
-    newPlayers[currentPlayer].score += 4; // Bonus for playing all cards
-    setPlayers(newPlayers);
-    startNewRound();
-  };
-
-  const startNewRound = () => {
-    setCurrentRound(prev => prev + 1);
-    if (currentRound >= numRounds) {
-      endGame();
+  const handleStartGame = () => {
+    if (!playerName.trim()) {
+      alert('Please enter your name');
       return;
     }
-    const newDeck = initializeDeck();
-    const newPlayers = players.map(player => ({ ...player, hand: [] }));
-    // Deal 5 cards to each player
-    for (let i = 0; i < 5; i++) {
-      for (let player of newPlayers) {
-        player.hand.push(newDeck.pop());
-      }
-    }
-    setDeck(newDeck);
-    setPlayers(newPlayers);
-    setTableCard(newDeck.pop());
-    setCurrentPlayer(0);
-    setHasDrawn(false);
-  };
-
-  const endGame = () => {
-    const maxScore = Math.max(...players.map(p => p.score));
-    const winners = players.filter(p => p.score === maxScore);
-    setGameWinners(winners);
-    setShowWinner(true);
-  };
-
-  const handleStartGame = () => {
-    const newDeck = initializeDeck();
-    // Create players with a sample hand and a score of 0.
-    const newPlayers = Array.from({ length: numPlayers }, (_, i) => ({
-      id: i === 0 ? userId : `player${i + 1}`,
-      name: `Player ${i + 1}`,
-      hand: [],
-      score: 0,
-    }));
-    // Deal initial 5 cards to each player
-    for (let i = 0; i < 5; i++) {
-      for (let player of newPlayers) {
-        player.hand.push(newDeck.pop());
-      }
-    }
-    setDeck(newDeck);
-    setPlayers(newPlayers);
-    setTableCard(newDeck.pop());
-    setCurrentRound(1);
     setGameStarted(true);
-    setCurrentPlayer(0);
-    setHasDrawn(false);
   };
 
   const resetGame = () => {
@@ -188,17 +115,26 @@ function App() {
     setDeck([]);
     setTableCard(null);
     setSelectedCard(null);
-    setCurrentPlayer(0);
     setCurrentRound(1);
     setHasDrawn(false);
+    setPlayerName('');
   };
 
-  // If the game hasn't started, show the setup screen.
   if (!gameStarted) {
     return (
       <div className="game-container">
         <div className="setup-form">
           <h1 className="title">Fadu Card Game</h1>
+          <div className="input-group">
+            <label>Your Name:</label>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Enter your name"
+              required
+            />
+          </div>
           <div className="input-group">
             <label>Number of Players:</label>
             <input
@@ -218,7 +154,11 @@ function App() {
               onChange={(e) => setNumRounds(parseInt(e.target.value))}
             />
           </div>
-          <button className="start-button" onClick={handleStartGame}>
+          <button 
+            className="start-button" 
+            onClick={handleStartGame}
+            disabled={!playerName.trim()}
+          >
             Start Game
           </button>
         </div>
@@ -226,37 +166,24 @@ function App() {
     );
   }
 
-  // Main game interface
   return (
     <div className="game-container">
       <div className="game-board">
         <div className="round-info">
           Round {currentRound} of {numRounds}
         </div>
-        <h1 className="title">Current Player: {players[currentPlayer]?.name}</h1>
-        <div className="scores-container">
-          {players.map(player => (
-            <div key={player.id} className="player-score">
-              {player.name}: {player.score} points
-            </div>
-          ))}
-        </div>
+        <h1 className="title">Current Player: {playerName}</h1>
         <div className="table-area">
           {tableCard && (
             <div className="card">
               {tableCard.value} of {tableCard.suit}
             </div>
           )}
-          <div className="deck-area">
-            <div className="deck-card">
-              Deck: {deck.length} cards
-            </div>
-          </div>
         </div>
         <div className="player-hand">
           <h2>Your Cards:</h2>
           <div className="cards-container">
-            {players[currentPlayer]?.hand.map((card, index) => (
+            {players.find(p => p.id === userId)?.hand.map((card, index) => (
               <div
                 key={index}
                 className={`card ${selectedCard === index ? 'selected' : ''}`}
@@ -271,9 +198,7 @@ function App() {
           <button
             className="game-button"
             onClick={drawCard}
-            disabled={hasDrawn || (tableCard && players[currentPlayer]?.hand.some(
-              card => card.value === tableCard.value
-            ))}
+            disabled={hasDrawn}
           >
             Draw Card
           </button>
@@ -317,4 +242,3 @@ function App() {
 }
 
 export default App;
-
