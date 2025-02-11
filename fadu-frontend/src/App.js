@@ -10,124 +10,124 @@ function App() {
   const [numRounds, setNumRounds] = useState(5);
   const [currentRound, setCurrentRound] = useState(1);
   const [players, setPlayers] = useState([]);
-  const [deck, setDeck] = useState([]);
+  const [currentTurn, setCurrentTurn] = useState(null);
   const [tableCard, setTableCard] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [showWinner, setShowWinner] = useState(false);
   const [gameWinners, setGameWinners] = useState([]);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [playerName, setPlayerName] = useState('');
-
-  // WebSocket state
-  const roomId = "room1";
-  // Use playerName if provided; otherwise use a default (this helps during initial load)
-  const userId = playerName || "player1";  
   const [socket, setSocket] = useState(null);
+  const [showRoomCode, setShowRoomCode] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState('');
 
-  // IMPORTANT: Your deployed backend URL (using wss:// for secure WebSocket connection)
   const backendURL = "wss://fadu-backend.onrender.com";
 
-  // Debug log to verify current state
-  console.log("Rendering App: gameStarted =", gameStarted, "playerName =", playerName);
-
-  // Establish WebSocket connection only when a player name is provided
   useEffect(() => {
-    if (!playerName || !roomCode) {
-      console.log("Missing player name or room code. Skipping WebSocket connection.");
-      return;
-    }
-    console.log("Attempting to connect WebSocket for user:", playerName, "in room:", roomCode);
+    if (!playerName || !roomCode || !gameStarted) return;
+
+    setIsConnecting(true);
+    setConnectionError('');
+    console.log(`Connecting to room ${roomCode} as ${playerName}`);
+    
     const ws = new WebSocket(`${backendURL}/ws/${roomCode}/${playerName}`);
     
     ws.onopen = () => {
-      console.log('Connected to WebSocket server');
+      console.log('Connected to game server');
+      setIsConnecting(false);
     };
     
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       console.log("Received:", data);
       
-      if (data.type === "welcome") {
-        // Set the initial hand for the player
-        setPlayers([{ id: userId, name: playerName, hand: data.hand, score: 0 }]);
-      } else if (data.type === "update_hand") {
-        // Update only this player's hand
-        setPlayers(prevPlayers =>
-          prevPlayers.map(player =>
-            player.id === userId ? { ...player, hand: data.hand } : player
-          )
-        );
-      } else if (data.type === "table_update") {
-        // Update the public table card
-        if (data.tableCard) {
+      switch(data.type) {
+        case "welcome":
+          setPlayers(prevPlayers => {
+            const newPlayer = { id: playerName, name: playerName, hand: data.hand, score: 0 };
+            if (!prevPlayers.find(p => p.id === playerName)) {
+              return [...prevPlayers, newPlayer];
+            }
+            return prevPlayers;
+          });
+          setCurrentTurn(data.current_turn);
+          if (data.tableCard) setTableCard(data.tableCard);
+          break;
+
+        case "player_joined":
+          console.log(`${data.user} joined the game`);
+          if (data.players_in_room) {
+            setPlayers(data.players_in_room.map(pid => ({
+              id: pid,
+              name: pid,
+              hand: pid === playerName ? players.find(p => p.id === playerName)?.hand || [] : [],
+              score: 0
+            })));
+          }
+          break;
+
+        case "update_hand":
+          setPlayers(prevPlayers =>
+            prevPlayers.map(player =>
+              player.id === playerName ? { ...player, hand: data.hand } : player
+            )
+          );
+          setHasDrawn(true);
+          break;
+
+        case "table_update":
           setTableCard(data.tableCard);
-        }
-        console.log("Broadcast:", data.message);
-      } else {
-        console.log("Message:", data.message);
+          setSelectedCard(null);
+          setHasDrawn(false);
+          break;
+
+        case "turn_update":
+          setCurrentTurn(data.current_turn);
+          setHasDrawn(false);
+          break;
+
+        case "player_left":
+          setPlayers(prevPlayers => prevPlayers.filter(p => p.id !== data.user));
+          if (data.current_turn) setCurrentTurn(data.current_turn);
+          break;
+
+        case "error":
+          setConnectionError(data.message);
+          break;
+
+        default:
+          console.log("Unhandled message type:", data.type);
       }
     };
     
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
+      setConnectionError('Failed to connect to game server');
+      setIsConnecting(false);
     };
     
     ws.onclose = () => {
-      console.log("WebSocket connection closed");
+      console.log("Disconnected from game server");
+      setIsConnecting(false);
     };
     
     setSocket(ws);
     
-    // Clean up on component unmount
     return () => {
       ws.close();
     };
-  }, [playerName, userId, roomId]);
-
-  // Functions for actions
+  }, [playerName, roomCode, gameStarted]);
 
   const handleCreateGame = () => {
     const newRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomCode(newRoomCode);
-    console.log("Creating game with room code:", newRoomCode);
-    
-    // Create WebSocket connection with new room code
-    const ws = new WebSocket(`${backendURL}/ws/${newRoomCode}/${playerName}`);
-    setSocket(ws);
+    setShowRoomCode(true);
     handleStartGame();
   };
 
-const handleJoinGame = () => {
-    console.log("Joining game with room code:", roomCode);
-    
-    // Join existing room
-    const ws = new WebSocket(`${backendURL}/ws/${roomCode}/${playerName}`);
-    setSocket(ws);
+  const handleJoinGame = () => {
     handleStartGame();
-  };
-
-  const drawCard = () => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ action: "draw_card" }));
-      setHasDrawn(true);
-    } else {
-      console.error("WebSocket is not open");
-    }
-  };
-
-  const playCard = () => {
-    if (selectedCard === null) return;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ action: "play_card", cardIndex: selectedCard }));
-    } else {
-      console.error("WebSocket is not open");
-    }
-  };
-
-  const handleCall = () => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ action: "call" }));
-    }
   };
 
   const handleStartGame = () => {
@@ -135,8 +135,25 @@ const handleJoinGame = () => {
       alert('Please enter your name');
       return;
     }
-    console.log("Starting game for player:", playerName);
     setGameStarted(true);
+  };
+
+  const drawCard = () => {
+    if (socket?.readyState === WebSocket.OPEN && currentTurn === playerName && !hasDrawn) {
+      socket.send(JSON.stringify({ action: "draw_card" }));
+    }
+  };
+
+  const playCard = () => {
+    if (socket?.readyState === WebSocket.OPEN && currentTurn === playerName && selectedCard !== null) {
+      socket.send(JSON.stringify({ action: "play_card", cardIndex: selectedCard }));
+    }
+  };
+
+  const handleCall = () => {
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ action: "call" }));
+    }
   };
 
   const resetGame = () => {
@@ -144,20 +161,25 @@ const handleJoinGame = () => {
     setShowWinner(false);
     setGameWinners([]);
     setPlayers([]);
-    setDeck([]);
     setTableCard(null);
     setSelectedCard(null);
     setCurrentRound(1);
     setHasDrawn(false);
     setPlayerName('');
+    setRoomCode('');
+    setShowRoomCode(false);
+    setIsCreatingGame(true);
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.close();
+    }
   };
 
-  // Render the join screen if the game has not started
   if (!gameStarted) {
     return (
       <div className="game-container">
         <div className="setup-form">
           <h1 className="title">Fadu Card Game</h1>
+          
           <div className="input-group">
             <label>Your Name:</label>
             <input
@@ -174,13 +196,13 @@ const handleJoinGame = () => {
               className={`mode-button ${isCreatingGame ? 'active' : ''}`}
               onClick={() => setIsCreatingGame(true)}
             >
-              Create Game
+              Create Room
             </button>
             <button 
               className={`mode-button ${!isCreatingGame ? 'active' : ''}`}
               onClick={() => setIsCreatingGame(false)}
             >
-              Join Game
+              Join Room
             </button>
           </div>
 
@@ -224,21 +246,48 @@ const handleJoinGame = () => {
             onClick={isCreatingGame ? handleCreateGame : handleJoinGame}
             disabled={!playerName.trim() || (!isCreatingGame && !roomCode.trim())}
           >
-            {isCreatingGame ? 'Create Game' : 'Join Game'}
+            {isCreatingGame ? 'Create Room' : 'Join Room'}
           </button>
+
+          {showRoomCode && (
+            <div className="room-code-display">
+              <p>Your Room Code: <strong>{roomCode}</strong></p>
+              <p>Share this code with other players to join!</p>
+            </div>
+          )}
+
+          {connectionError && (
+            <div className="error-message">
+              {connectionError}
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  // Once gameStarted is true, render the game board
   return (
     <div className="game-container">
       <div className="game-board">
-        <div className="round-info">
-          Round {currentRound} of {numRounds}
+        <div className="game-info">
+          <div className="round-info">
+            Round {currentRound} of {numRounds}
+          </div>
+          <div className="room-info">
+            Room Code: {roomCode}
+          </div>
         </div>
-        <h1 className="title">Current Player: {playerName}</h1>
+        
+        <h1 className="title">Current Player: {currentTurn}</h1>
+        
+        <div className="players-list">
+          {players.map(player => (
+            <div key={player.id} className={`player-info ${currentTurn === player.id ? 'current-turn' : ''}`}>
+              {player.name} {player.id === playerName ? '(You)' : ''} - Score: {player.score}
+            </div>
+          ))}
+        </div>
+
         <div className="table-area">
           {tableCard && (
             <div className="card">
@@ -246,40 +295,47 @@ const handleJoinGame = () => {
             </div>
           )}
         </div>
+
         <div className="player-hand">
           <h2>Your Cards:</h2>
           <div className="cards-container">
-            {players.find(p => p.id === userId)?.hand.map((card, index) => (
+            {players.find(p => p.id === playerName)?.hand.map((card, index) => (
               <div
                 key={index}
                 className={`card ${selectedCard === index ? 'selected' : ''}`}
-                onClick={() => setSelectedCard(index)}
+                onClick={() => currentTurn === playerName && setSelectedCard(index)}
               >
                 {card.value} of {card.suit}
               </div>
             ))}
           </div>
         </div>
+
         <div className="controls">
           <button
             className="game-button"
             onClick={drawCard}
-            disabled={hasDrawn}
+            disabled={currentTurn !== playerName || hasDrawn}
           >
             Draw Card
           </button>
           <button
             className="game-button"
             onClick={playCard}
-            disabled={selectedCard === null}
+            disabled={currentTurn !== playerName || selectedCard === null}
           >
             Play Card
           </button>
-          <button className="game-button" onClick={handleCall}>
+          <button 
+            className="game-button" 
+            onClick={handleCall}
+            disabled={currentTurn !== playerName}
+          >
             Call
           </button>
         </div>
       </div>
+
       {showWinner && (
         <>
           <div className="overlay"></div>

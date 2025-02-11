@@ -1,45 +1,292 @@
+/* Base Container */
 .game-container {
   text-align: center;
   font-family: Arial, sans-serif;
   margin: 20px;
+  min-height: 100vh;
+  background-color: #f5f5f5;
 }
 
-.setup-form, .game-board {
+/* Setup Form */
+.setup-form {
+  background-color: white;
   border: 1px solid #ccc;
-  padding: 20px;
-  margin: auto;
-  max-width: 600px;
-  border-radius: 8px;
+  padding: 30px;
+  margin: 20px auto;
+  max-width: 500px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
+.title {
+  color: #2c3e50;
+  margin-bottom: 30px;
+  font-size: 2.2em;
+}
+
+/* Input Groups */
 .input-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  text-align: left;
 }
 
 .input-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  color: #34495e;
+  font-weight: bold;
 }
 
+.input-group input {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.input-group input:focus {
+  border-color: #3498db;
+  outline: none;
+}
+
+/* Game Mode Selector */
+.game-mode-selector {
+  display: flex;
+  gap: 15px;
+  margin: 25px 0;
+}
+
+.mode-button {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #3498db;
+  background: white;
+  color: #3498db;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.mode-button:hover {
+  background: #3498db;
+  color: white;
+}
+
+.mode-button.active {
+  background: #3498db;
+  color: white;
+}
+
+/* Start/Create/Join Button */
+.start-button {
+  width: 100%;
+  padding: 12px;
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.start-button:hover {
+  background-color: #27ae60;
+}
+
+.start-button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+/* Room Code Display */
+.room-code-display {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 2px dashed #3498db;
+}
+
+.room-code-display strong {
+  color: #e74c3c;
+  font-size: 1.2em;
+}
+
+/* Game Board */
+.game-board {
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 30px;
+  margin: 20px auto;
+  max-width: 800px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Game Info Section */
+.game-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+}
+
+.round-info, .room-info {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+/* Players List */
+.players-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.player-info {
+  padding: 8px 15px;
+  background-color: #f8f9fa;
+  border-radius: 20px;
+  font-size: 14px;
+}
+
+.player-info.current-turn {
+  background-color: #3498db;
+  color: white;
+}
+
+/* Table Area */
+.table-area {
+  min-height: 150px;
+  margin: 20px 0;
+  padding: 20px;
+  background-color: #27ae60;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Cards */
 .cards-container {
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
   justify-content: center;
+  margin: 20px 0;
 }
 
 .card {
-  border: 1px solid #333;
-  padding: 10px;
-  margin: 5px;
+  background-color: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  min-width: 100px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
 .card.selected {
-  background-color: #e0e0e0;
+  border-color: #3498db;
+  background-color: #ebf5fb;
+  transform: translateY(-5px);
+}
+
+/* Game Controls */
+.controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
 }
 
 .game-button {
-  margin: 5px;
-  padding: 10px 20px;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
   cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: #3498db;
+  color: white;
+}
+
+.game-button:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.game-button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+/* Winner Announcement */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+}
+
+.winner-announcement {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  padding: 30px;
+  border-radius: 12px;
+  z-index: 1001;
+  min-width: 300px;
+  text-align: center;
+}
+
+/* Error Message */
+.error-message {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 6px;
+  border: 1px solid #ef9a9a;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .setup-form, .game-board {
+      margin: 10px;
+      padding: 15px;
+  }
+
+  .card {
+      min-width: 80px;
+      padding: 10px;
+      font-size: 14px;
+  }
+
+  .controls {
+      flex-direction: column;
+  }
+
+  .game-button {
+      width: 100%;
+  }
 }
