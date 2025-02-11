@@ -3,6 +3,8 @@ import './styles.css';
 
 function App() {
   // Game state variables
+  const [roomCode, setRoomCode] = useState('');
+  const [isCreatingGame, setIsCreatingGame] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
   const [numPlayers, setNumPlayers] = useState(2);
   const [numRounds, setNumRounds] = useState(5);
@@ -30,12 +32,12 @@ function App() {
 
   // Establish WebSocket connection only when a player name is provided
   useEffect(() => {
-    if (!playerName) {
-      console.log("No player name entered yet. Skipping WebSocket connection.");
-      return; // Do not attempt connection until a name is provided
+    if (!playerName || !roomCode) {
+      console.log("Missing player name or room code. Skipping WebSocket connection.");
+      return;
     }
-    console.log("Attempting to connect WebSocket for user:", userId);
-    const ws = new WebSocket(`${backendURL}/ws/${roomId}/${userId}`);
+    console.log("Attempting to connect WebSocket for user:", playerName, "in room:", roomCode);
+    const ws = new WebSocket(`${backendURL}/ws/${roomCode}/${playerName}`);
     
     ws.onopen = () => {
       console.log('Connected to WebSocket server');
@@ -83,6 +85,27 @@ function App() {
   }, [playerName, userId, roomId]);
 
   // Functions for actions
+
+  const handleCreateGame = () => {
+    const newRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setRoomCode(newRoomCode);
+    console.log("Creating game with room code:", newRoomCode);
+    
+    // Create WebSocket connection with new room code
+    const ws = new WebSocket(`${backendURL}/ws/${newRoomCode}/${playerName}`);
+    setSocket(ws);
+    handleStartGame();
+  };
+
+const handleJoinGame = () => {
+    console.log("Joining game with room code:", roomCode);
+    
+    // Join existing room
+    const ws = new WebSocket(`${backendURL}/ws/${roomCode}/${playerName}`);
+    setSocket(ws);
+    handleStartGame();
+  };
+
   const drawCard = () => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ action: "draw_card" }));
@@ -133,7 +156,7 @@ function App() {
   if (!gameStarted) {
     return (
       <div className="game-container">
-        <div className="setup-form" style={{ border: '2px solid red', padding: '20px' }}>
+        <div className="setup-form">
           <h1 className="title">Fadu Card Game</h1>
           <div className="input-group">
             <label>Your Name:</label>
@@ -145,31 +168,63 @@ function App() {
               required
             />
           </div>
-          <div className="input-group">
-            <label>Number of Players:</label>
-            <input
-              type="number"
-              min="2"
-              max="8"
-              value={numPlayers}
-              onChange={(e) => setNumPlayers(parseInt(e.target.value))}
-            />
+
+          <div className="game-mode-selector">
+            <button 
+              className={`mode-button ${isCreatingGame ? 'active' : ''}`}
+              onClick={() => setIsCreatingGame(true)}
+            >
+              Create Game
+            </button>
+            <button 
+              className={`mode-button ${!isCreatingGame ? 'active' : ''}`}
+              onClick={() => setIsCreatingGame(false)}
+            >
+              Join Game
+            </button>
           </div>
-          <div className="input-group">
-            <label>Number of Rounds:</label>
-            <input
-              type="number"
-              min="1"
-              value={numRounds}
-              onChange={(e) => setNumRounds(parseInt(e.target.value))}
-            />
-          </div>
+
+          {isCreatingGame ? (
+            <>
+              <div className="input-group">
+                <label>Number of Players:</label>
+                <input
+                  type="number"
+                  min="2"
+                  max="8"
+                  value={numPlayers}
+                  onChange={(e) => setNumPlayers(parseInt(e.target.value))}
+                />
+              </div>
+              <div className="input-group">
+                <label>Number of Rounds:</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={numRounds}
+                  onChange={(e) => setNumRounds(parseInt(e.target.value))}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="input-group">
+              <label>Room Code:</label>
+              <input
+                type="text"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                placeholder="Enter room code"
+                required
+              />
+            </div>
+          )}
+
           <button 
-            className="start-button" 
-            onClick={handleStartGame}
-            disabled={!playerName.trim()}
+            className="start-button"
+            onClick={isCreatingGame ? handleCreateGame : handleJoinGame}
+            disabled={!playerName.trim() || (!isCreatingGame && !roomCode.trim())}
           >
-            Start Game
+            {isCreatingGame ? 'Create Game' : 'Join Game'}
           </button>
         </div>
       </div>
